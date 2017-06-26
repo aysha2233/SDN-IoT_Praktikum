@@ -16,13 +16,23 @@
  ******************************************************************************/
 package org.eclipse.californium.examples;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
 
 import org.eclipse.californium.core.CoapResource;
 import org.eclipse.californium.core.CoapServer;
+import org.eclipse.californium.core.Utils;
+import org.eclipse.californium.core.coap.CoAP;
+import org.eclipse.californium.core.coap.MediaTypeRegistry;
+import org.eclipse.californium.core.coap.Response;
 import org.eclipse.californium.core.network.CoapEndpoint;
 import org.eclipse.californium.core.network.EndpointManager;
 import org.eclipse.californium.core.network.config.NetworkConfig;
@@ -68,9 +78,25 @@ public class HelloWorldServer extends CoapServer {
      * of the server are initialized.
      */
     public HelloWorldServer() throws SocketException {
-        
+
         // provide an instance of a Hello-World resource
-        add(new HelloWorldResource());
+        //add(new HelloWorldResource());
+        //add(new SimpleJSONRessource());
+
+        Path dir = Paths.get("content");
+        if (Files.exists(dir)) {
+            try {
+                Files.list(dir).forEach(file -> add(new SimpleFileRessource(file.toAbsolutePath())));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            try {
+                Files.createDirectory(dir);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /*
@@ -92,6 +118,63 @@ public class HelloWorldServer extends CoapServer {
             
             // respond to the request
             exchange.respond("Hello World!");
+        }
+    }
+
+    class SimpleJSONRessource extends CoapResource {
+
+        public  SimpleJSONRessource() {
+            super("simpleJSON");
+            getAttributes().setTitle(this.getName());
+        }
+
+        public void handleGET(CoapExchange exchange) {
+            exchange.respond("{name: \"simpleJSON\", status: \"up\", size: \"51 Byte\"}");
+        }
+    }
+
+    class SimpleFileRessource extends CoapResource{
+
+        byte[] payload;
+        int mediaType;
+
+        public SimpleFileRessource() {
+            super("emptyFile");
+            getAttributes().setTitle(this.getName());
+        }
+
+        public SimpleFileRessource(Path path) {
+            super(path.getFileName().toString());
+            try {
+                this.payload = Files.readAllBytes(path);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            String[] tmp = path.toString().split("\\.");
+            switch (tmp[tmp.length -1]){
+                case "jpg":
+                case "jpeg":
+                    mediaType = MediaTypeRegistry.IMAGE_JPEG;
+                    break;
+                case "png":
+                    mediaType = MediaTypeRegistry.IMAGE_PNG;
+                    break;
+                default:
+                    mediaType = MediaTypeRegistry.TEXT_PLAIN;
+            }
+            getAttributes().setTitle(this.getName());
+        }
+
+        public void handleGET(CoapExchange exchange) {
+            if (payload == null) {
+                exchange.respond("no content");
+            }
+            else {
+                Response resp = new Response(CoAP.ResponseCode.CONTENT);
+                resp.getOptions().setContentFormat(this.mediaType);
+                resp.setPayload(this.payload);
+                exchange.respond(resp);
+            }
         }
     }
 }

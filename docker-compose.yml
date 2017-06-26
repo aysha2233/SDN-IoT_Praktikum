@@ -1,0 +1,10 @@
+version: "2"
+services:
+  coap:
+    image: "maven:3.5-jdk-8"
+    volumes:
+      - ".:/usr/src"
+    working_dir: "/usr/src"
+    command: "/usr/src/start.sh"
+    ports:
+      - "5683:5683"
